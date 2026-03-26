@@ -8,7 +8,17 @@ if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 
-const dbPath = path.join(dbDir, 'rotilezat.db');
+let dbPath;
+if (process.env.VERCEL) {
+  dbPath = '/tmp/rotilezat.db';
+  const seedDbPath = path.join(dbDir, 'rotilezat.db');
+  if (!fs.existsSync(dbPath) && fs.existsSync(seedDbPath)) {
+    fs.copyFileSync(seedDbPath, dbPath);
+  }
+} else {
+  dbPath = path.join(dbDir, 'rotilezat.db');
+}
+
 const db = new Database(dbPath);
 
 // Enable foreign keys
