@@ -78,12 +78,12 @@ export function Login() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Email / Username</Label>
                 <Input
                   id="email"
                   name="email"
-                  type="email"
-                  placeholder="nama@email.com"
+                  type="text"
+                  placeholder="Email / Username (contoh: Admin)"
                   value={formData.email}
                   onChange={handleChange}
                   required
@@ -155,14 +155,7 @@ export function Login() {
               </p>
             </div>
 
-            {/* Demo credentials */}
-            <div className="mt-6 p-4 bg-amber-50 rounded-lg">
-              <p className="text-xs text-amber-800 text-center">
-                <strong>Akun Demo:</strong><br />
-                Admin: admin@rotilezat.com / admin123<br />
-                User: Buat akun baru atau gunakan register
-              </p>
-            </div>
+
           </CardContent>
         </Card>
       </div>

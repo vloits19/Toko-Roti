@@ -129,7 +129,7 @@ function initDatabase() {
 // Seed initial data
 function seedData() {
   // Check if admin exists
-  const adminExists = db.prepare('SELECT * FROM users WHERE email = ?').get('admin@rotilezat.com');
+  const adminExists = db.prepare('SELECT * FROM users WHERE email = ?').get('Admin');
   
   if (!adminExists) {
     const bcrypt = require('bcryptjs');
@@ -138,9 +138,9 @@ function seedData() {
     db.prepare(`
       INSERT INTO users (name, email, password, role) 
       VALUES (?, ?, ?, ?)
-    `).run('Admin Roti Lezat', 'admin@rotilezat.com', hashedPassword, 'admin');
+    `).run('Admin', 'Admin', hashedPassword, 'admin');
     
-    console.log('Admin user created: admin@rotilezat.com / admin123');
+    console.log('Admin user created: Admin / admin123');
   }
 
   // Check if products exist
