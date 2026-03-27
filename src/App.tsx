@@ -20,6 +20,11 @@ import { Cart } from '@/pages/Cart';
 import { Orders } from '@/pages/Orders';
 import { Profile } from '@/pages/Profile';
 
+// Payment Pages
+import { PaymentSuccess } from '@/pages/PaymentSuccess';
+import { PaymentPending } from '@/pages/PaymentPending';
+import { PaymentError } from '@/pages/PaymentError';
+
 // Admin Pages
 import { AdminDashboard } from '@/pages/admin/AdminDashboard';
 import { AdminProducts } from '@/pages/admin/AdminProducts';
@@ -117,6 +122,11 @@ function AppRoutes() {
           <PublicLayout><Profile /></PublicLayout>
         </ProtectedRoute>
       } />
+
+      {/* Payment Routes */}
+      <Route path="/payment/success" element={<PublicLayout><PaymentSuccess /></PublicLayout>} />
+      <Route path="/payment/pending" element={<PublicLayout><PaymentPending /></PublicLayout>} />
+      <Route path="/payment/error" element={<PublicLayout><PaymentError /></PublicLayout>} />
 
       {/* Admin Routes */}
       <Route path="/admin" element={

@@ -14,8 +14,6 @@ import {
   ShoppingBag, 
   ArrowRight, 
   Package,
-  CreditCard,
-  Truck,
   Shield
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -26,15 +24,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 
-const PAYMENT_METHODS = [
-  { id: 'bank_transfer', name: 'Transfer Bank', icon: CreditCard },
-  { id: 'virtual_account', name: 'Virtual Account', icon: CreditCard },
-  { id: 'e_wallet', name: 'E-Wallet', icon: CreditCard },
-  { id: 'cod', name: 'Bayar di Tempat (COD)', icon: Truck }
-];
+// Removed custom PAYMENT_METHODS since we use Midtrans
 
 export function Cart() {
   const navigate = useNavigate();
@@ -42,7 +34,7 @@ export function Cart() {
   const { user, isAuthenticated } = useAuth();
   
   const [showCheckoutDialog, setShowCheckoutDialog] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState('bank_transfer');
+  const [selectedPayment] = useState('midtrans');
   const [shippingPhone, setShippingPhone] = useState('');
   const [shippingAddress, setShippingAddress] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -83,11 +75,65 @@ export function Cart() {
     
     try {
       const response = await api.createOrder(selectedPayment, shippingPhone, shippingAddress);
+      
       if (response.success && response.data) {
-        toast.success('Pesanan berhasil dibuat!');
-        await refreshCart();
-        setShowCheckoutDialog(false);
-        navigate('/orders');
+        const order = (response.data as any).order;
+
+        // Prepare items for Midtrans
+        const item_details = items.map(item => ({
+          id: String(item.product_id),
+          price: item.price,
+          quantity: item.quantity,
+          name: item.name.substring(0, 50),
+          merchant_name: "Roti Lezat"
+        }));
+
+        // Get midtrans token 
+        const apiUrl = import.meta.env.PROD ? '/api' : 'http://localhost:3001/api';
+        const tokenResponse = await fetch(`${apiUrl}/midtrans/token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            order_id: String(order.id) + '-' + Date.now(), // Append timestamp to avoid duplicate order ID in sandbox
+            gross_amount: total,
+            item_details: item_details,
+            customer_details: {
+              first_name: user?.name,
+              email: user?.email,
+              phone: shippingPhone
+            }
+          })
+        });
+
+        const tokenData = await tokenResponse.json();
+
+        if (tokenData.success && tokenData.token) {
+          // Clear cart right before payment popup
+          await refreshCart();
+          setShowCheckoutDialog(false);
+
+          // Trigger Midtrans Snap
+          (window as any).snap.pay(tokenData.token, {
+            onSuccess: function(result: any) { 
+              navigate('/payment/success', { state: { result, orderId: order.id } }); 
+            },
+            onPending: function(result: any) { 
+              navigate('/payment/pending', { state: { result, orderId: order.id } }); 
+            },
+            onError: function(result: any) { 
+              navigate('/payment/error', { state: { result, orderId: order.id } }); 
+            },
+            onClose: function() { 
+              toast.info('Anda menutup popup pembayaran sebelum menyelesaikan pembayaran');
+              navigate('/orders'); 
+            }
+          });
+        } else {
+          toast.error('Gagal mendapatkan token pembayaran');
+          await refreshCart();
+          setShowCheckoutDialog(false);
+          navigate('/orders');
+        }
       }
     } catch (error: any) {
       toast.error(error.message || 'Gagal membuat pesanan');
@@ -247,37 +293,13 @@ export function Cart() {
       <Dialog open={showCheckoutDialog} onOpenChange={setShowCheckoutDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Pilih Metode Pembayaran</DialogTitle>
+            <DialogTitle>Detail Pengiriman</DialogTitle>
             <DialogDescription>
-              Pilih metode pembayaran yang Anda inginkan
+              Silakan lengkapi informasi pengiriman pesanan Anda
             </DialogDescription>
           </DialogHeader>
 
-          <RadioGroup
-            value={selectedPayment}
-            onValueChange={setSelectedPayment}
-            className="space-y-3"
-          >
-            {PAYMENT_METHODS.map((method) => (
-              <div key={method.id}>
-                <RadioGroupItem
-                  value={method.id}
-                  id={method.id}
-                  className="peer sr-only"
-                />
-                <Label
-                  htmlFor={method.id}
-                  className="flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all peer-data-[state=checked]:border-amber-500 peer-data-[state=checked]:bg-amber-50 hover:bg-amber-50/50"
-                >
-                  <method.icon className="w-5 h-5 text-amber-600" />
-                  <span className="flex-1">{method.name}</span>
-                </Label>
-              </div>
-            ))}
-          </RadioGroup>
-
-          <div className="space-y-3 mt-4 border-t pt-4">
-            <h4 className="font-semibold text-stone-800">Detail Pengiriman</h4>
+          <div className="space-y-4 pt-4">
             <div className="space-y-2">
               <Label htmlFor="shippingPhone">Nomor Telepon</Label>
               <Input
@@ -294,8 +316,8 @@ export function Cart() {
                 id="shippingAddress"
                 value={shippingAddress}
                 onChange={(e) => setShippingAddress(e.target.value)}
-                className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                placeholder="Alamat pengiriman..."
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                placeholder="Contoh: Jl. Merdeka No 123, RT 01/RW 02, Kec. Sukamaju, Kota Jakarta Selatan..."
                 required
               />
             </div>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/services/api';
 import type { Order } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,10 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  Truck
+  Truck,
+  MessageSquare,
+  Send,
+  CreditCard
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -19,6 +23,11 @@ export function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedOrder, setExpandedOrder] = useState<number | null>(null);
+  
+  const { user } = useAuth();
+  const [messageTexts, setMessageTexts] = useState<Record<number, string>>({});
+  const [isSending, setIsSending] = useState<Record<number, boolean>>({});
+  const [isPaying, setIsPaying] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     fetchOrders();
@@ -82,6 +91,82 @@ export function Orders() {
     setExpandedOrder(expandedOrder === orderId ? null : orderId);
   };
 
+  const handlePayNow = async (order: Order) => {
+    setIsPaying(prev => ({ ...prev, [order.id]: true }));
+    try {
+      const apiUrl = import.meta.env.PROD ? '/api' : 'http://localhost:3001/api';
+      const tokenResponse = await fetch(`${apiUrl}/midtrans/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: String(order.id) + '-' + Date.now(),
+          gross_amount: order.total_price,
+          item_details: order.items?.map(item => ({
+            id: String(item.product_id),
+            price: item.price,
+            quantity: item.quantity,
+            name: (item.product_name || 'Item').substring(0, 50),
+            merchant_name: "Roti Lezat"
+          })) || [],
+          customer_details: {
+            first_name: user?.name,
+            email: user?.email,
+            phone: order.shipping_phone
+          }
+        })
+      });
+
+      const tokenData = await tokenResponse.json();
+
+      if (tokenData.success && tokenData.token) {
+        (window as any).snap.pay(tokenData.token, {
+          onSuccess: function() { 
+            window.location.href = '/payment/success'; 
+          },
+          onPending: function() { 
+            window.location.href = '/payment/pending';
+          },
+          onError: function() { 
+            window.location.href = '/payment/error'; 
+          },
+          onClose: function() { 
+            toast.info('Anda menutup popup pembayaran');
+            fetchOrders();
+          }
+        });
+      } else {
+        toast.error('Gagal mendapatkan token pembayaran');
+      }
+    } catch (error) {
+      toast.error('Gagal memproses pembayaran');
+    } finally {
+      setIsPaying(prev => ({ ...prev, [order.id]: false }));
+    }
+  };
+
+  const setOrderMessage = (orderId: number, text: string) => {
+    setMessageTexts(prev => ({ ...prev, [orderId]: text }));
+  };
+
+  const handleSendMessage = async (order: Order) => {
+    const text = messageTexts[order.id];
+    if (!text?.trim() || !user) return;
+
+    setIsSending(prev => ({ ...prev, [order.id]: true }));
+    try {
+      const fullMessage = `Terkait Pesanan #${order.id.toString().padStart(6, '0')}:\n\n${text}`;
+      const response = await api.sendMessage(user.name, user.email, fullMessage);
+      if (response.success) {
+        toast.success('Pesan berhasil dikirim ke penjual');
+        setMessageTexts(prev => ({ ...prev, [order.id]: '' }));
+      }
+    } catch (error) {
+      toast.error('Gagal mengirim pesan');
+    } finally {
+      setIsSending(prev => ({ ...prev, [order.id]: false }));
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-amber-50/30 py-8">
@@ -140,6 +225,23 @@ export function Orders() {
                   </div>
                   <div className="flex items-center gap-4">
                     {getStatusBadge(order.payment_status)}
+                    {order.payment_status === 'pending' && (
+                      <Button
+                        size="sm"
+                        className="bg-amber-500 hover:bg-amber-600 text-white"
+                        disabled={isPaying[order.id]}
+                        onClick={() => handlePayNow(order)}
+                      >
+                        {isPaying[order.id] ? (
+                          <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        ) : (
+                          <>
+                            <CreditCard className="w-4 h-4 mr-2" />
+                            Bayar Sekarang
+                          </>
+                        )}
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -214,6 +316,55 @@ export function Orders() {
                           <span className="text-stone-500 block mb-1">Pengiriman Ke:</span>
                           <p className="font-medium text-stone-800 text-sm">{order.shipping_phone}</p>
                           <p className="text-stone-600 text-sm whitespace-pre-wrap">{order.shipping_address}</p>
+                        </div>
+                      )}
+
+                      {(order.payment_status === 'paid' || ['processing', 'confirmed', 'shipped'].includes(order.order_status)) && (
+                        <div className="mt-6 pt-4 border-t bg-stone-50 p-4 rounded-lg">
+                          <div className="flex items-center gap-2 mb-3">
+                            <MessageSquare className="w-5 h-5 text-amber-500" />
+                            <h4 className="font-semibold text-stone-800">Hubungi Penjual</h4>
+                          </div>
+                          
+                          <div className="flex flex-wrap gap-2 mb-3">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="text-xs bg-white"
+                              onClick={() => setOrderMessage(order.id, 'Apakah pesanan saya sudah bisa dikirim?')}
+                            >
+                              Apakah pesanan saya sudah bisa dikirim?
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="text-xs bg-white"
+                              onClick={() => setOrderMessage(order.id, 'Pesanan saya dikirim kapan?')}
+                            >
+                              Pesanan saya dikirim kapan?
+                            </Button>
+                          </div>
+                          
+                          <div className="flex gap-2">
+                            <textarea
+                              value={messageTexts[order.id] || ''}
+                              onChange={(e) => setOrderMessage(order.id, e.target.value)}
+                              placeholder="Tulis pesan untuk penjual..."
+                              className="flex min-h-[40px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
+                              rows={2}
+                            />
+                            <Button 
+                              className="bg-amber-500 hover:bg-amber-600 self-end px-3"
+                              disabled={!messageTexts[order.id]?.trim() || isSending[order.id]}
+                              onClick={() => handleSendMessage(order)}
+                            >
+                              {isSending[order.id] ? (
+                                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              ) : (
+                                <Send className="w-4 h-4" />
+                              )}
+                            </Button>
+                          </div>
                         </div>
                       )}
                     </div>

@@ -20,6 +20,7 @@ app.use('/api/products', require('./routes/products'));
 app.use('/api/orders', require('./routes/orders'));
 app.use('/api/cart', require('./routes/cart'));
 app.use('/api/messages', require('./routes/messages'));
+app.use('/api/midtrans', require('./api/route'));
 
 // Health check
 app.get('/api/health', (req, res) => {
