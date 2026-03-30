@@ -1,25 +1,17 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "backend/server.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": [
-          "backend/database/rotilezat.db",
-          "node_modules/better-sqlite3/**/*.node"
-        ]
-      }
-    },
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build"
+  "functions": {
+    "api/**/*.cjs": {
+      "includeFiles": [
+        "backend/database/rotilezat.db",
+        "node_modules/better-sqlite3/**/*.node"
+      ]
     }
-  ],
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/backend/server.js"
+      "destination": "/api/index.cjs"
     },
     {
       "source": "/(.*)",
