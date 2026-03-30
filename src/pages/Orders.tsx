@@ -120,7 +120,8 @@ export function Orders() {
 
       if (tokenData.success && tokenData.token) {
         (window as any).snap.pay(tokenData.token, {
-          onSuccess: function() { 
+          onSuccess: async function() { 
+            await api.markOrderPaid(order.id);
             window.location.href = '/payment/success'; 
           },
           onPending: function() { 
@@ -157,8 +158,11 @@ export function Orders() {
       const fullMessage = `Terkait Pesanan #${order.id.toString().padStart(6, '0')}:\n\n${text}`;
       const response = await api.sendMessage(user.name, user.email, fullMessage);
       if (response.success) {
-        toast.success('Pesan berhasil dikirim ke penjual');
+        toast.success('Pesan terkirim! Mengarahkan ke obrolan...');
         setMessageTexts(prev => ({ ...prev, [order.id]: '' }));
+        setTimeout(() => {
+          window.location.href = '/contact';
+        }, 1000);
       }
     } catch (error) {
       toast.error('Gagal mengirim pesan');
@@ -319,7 +323,7 @@ export function Orders() {
                         </div>
                       )}
 
-                      {(order.payment_status === 'paid' || ['processing', 'confirmed', 'shipped'].includes(order.order_status)) && (
+                      {order.payment_status === 'paid' && (
                         <div className="mt-6 pt-4 border-t bg-stone-50 p-4 rounded-lg">
                           <div className="flex items-center gap-2 mb-3">
                             <MessageSquare className="w-5 h-5 text-amber-500" />

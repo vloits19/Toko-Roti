@@ -1,106 +1,126 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { api } from '@/services/api';
 import type { Message } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-
 import { Input } from '@/components/ui/input';
-import { 
-  Search, 
-  Mail, 
-  MailOpen, 
-  Trash2, 
+import {
+  Search,
+  Send,
   Loader2,
-  Eye
+  MessageSquare,
+  User,
+  ArrowLeft
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+interface Conversation {
+  user_id: number;
+  name: string;
+  email: string;
+  last_message: string;
+  last_message_at: string;
+  unread_count: number;
+}
+
 export function AdminMessages() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [chatMessages, setChatMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isChatLoading, setIsChatLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
-  const [showDetailDialog, setShowDetailDialog] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [isReplying, setIsReplying] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchMessages();
+    fetchConversations();
+    const interval = setInterval(fetchConversations, 5000);
+    return () => clearInterval(interval);
   }, []);
 
-  const fetchMessages = async () => {
+  useEffect(() => {
+    if (selectedUserId) {
+      fetchChat(selectedUserId);
+      const interval = setInterval(() => fetchChat(selectedUserId), 3000);
+      return () => clearInterval(interval);
+    }
+  }, [selectedUserId]);
+
+  const fetchConversations = async () => {
     try {
-      const response = await api.getMessages();
+      const response = await api.getConversations();
       if (response.success && response.data) {
-        setMessages(response.data.messages);
+        setConversations(response.data.conversations);
       }
     } catch (error) {
-      toast.error('Gagal memuat pesan');
+      console.error('Failed to fetch conversations');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const markAsRead = async (id: number) => {
+  const fetchChat = async (userId: number) => {
     try {
-      await api.markMessageAsRead(id);
-      toast.success('Pesan ditandai sebagai dibaca');
-      fetchMessages();
+      const response = await api.getConversation(userId);
+      if (response.success && response.data) {
+        setChatMessages(response.data.messages);
+      }
     } catch (error) {
-      toast.error('Gagal menandai pesan');
+      console.error('Failed to fetch chat');
+    } finally {
+      setIsChatLoading(false);
     }
   };
 
-  const deleteMessage = async (id: number) => {
-    if (!confirm('Apakah Anda yakin ingin menghapus pesan ini?')) return;
+  const openChat = (userId: number) => {
+    setSelectedUserId(userId);
+    setIsChatLoading(true);
+    setReplyText('');
+  };
 
+  const handleSendReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!replyText.trim() || !selectedUserId) return;
+    setIsReplying(true);
     try {
-      await api.deleteMessage(id);
-      toast.success('Pesan dihapus');
-      fetchMessages();
+      const res = await api.replyToUser(selectedUserId, replyText);
+      if (res.success) {
+        setReplyText('');
+        await fetchChat(selectedUserId);
+        await fetchConversations();
+      }
     } catch (error) {
-      toast.error('Gagal menghapus pesan');
+      toast.error('Gagal mengirim balasan');
+    } finally {
+      setIsReplying(false);
     }
   };
 
-  const openMessageDetail = (message: Message) => {
-    setSelectedMessage(message);
-    setShowDetailDialog(true);
-    if (message.is_read === 0) {
-      markAsRead(message.id);
+  const formatTime = (dateString?: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    if (isToday) {
+      return date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
     }
+    return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('id-ID', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  const formatChatTime = (dateString?: string) => {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
   };
 
-  const filteredMessages = messages.filter(message =>
-    message.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    message.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    message.message.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredConversations = conversations.filter(c =>
+    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    c.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const unreadCount = messages.filter(m => m.is_read === 0).length;
+  const selectedConversation = conversations.find(c => c.user_id === selectedUserId);
+
+  const totalUnread = conversations.reduce((sum, c) => sum + c.unread_count, 0);
 
   return (
     <div className="min-h-screen bg-amber-50/30">
@@ -108,157 +128,174 @@ export function AdminMessages() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-stone-800">Pesan Masuk</h1>
+              <h1 className="text-2xl font-bold text-stone-800">Live Chat</h1>
               <p className="text-stone-500 text-sm">
-                {unreadCount > 0 ? `${unreadCount} pesan belum dibaca` : 'Tidak ada pesan baru'}
+                {totalUnread > 0 ? `${totalUnread} pesan belum dibaca` : 'Semua pesan terbaca'}
               </p>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
-        {/* Search */}
-        <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
-          <Input
-            placeholder="Cari pesan..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 max-w-md"
-          />
-        </div>
-
-        {/* Messages Table */}
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">Status</TableHead>
-                  <TableHead>Nama</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Pesan</TableHead>
-                  <TableHead>Tanggal</TableHead>
-                  <TableHead className="text-right">Aksi</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8">
-                      <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-                    </TableCell>
-                  </TableRow>
-                ) : filteredMessages.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-stone-500">
-                      Tidak ada pesan ditemukan
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredMessages.map((message) => (
-                    <TableRow 
-                      key={message.id}
-                      className={message.is_read === 0 ? 'bg-amber-50/50' : ''}
-                    >
-                      <TableCell>
-                        {message.is_read === 0 ? (
-                          <Mail className="w-5 h-5 text-amber-500" />
-                        ) : (
-                          <MailOpen className="w-5 h-5 text-stone-400" />
-                        )}
-                      </TableCell>
-                      <TableCell className="font-medium">{message.name}</TableCell>
-                      <TableCell className="text-stone-500">{message.email}</TableCell>
-                      <TableCell>
-                        <p className="truncate max-w-xs">{message.message}</p>
-                      </TableCell>
-                      <TableCell className="text-sm text-stone-500">
-                        {formatDate(message.created_at || '')}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openMessageDetail(message)}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => deleteMessage(message.id)}
-                          className="text-red-500 hover:text-red-600"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </main>
-
-      {/* Message Detail Dialog */}
-      <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Detail Pesan</DialogTitle>
-            <DialogDescription>
-              Pesan dari {selectedMessage?.name}
-            </DialogDescription>
-          </DialogHeader>
+      <main className="container mx-auto px-4 py-6">
+        <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden flex h-[calc(100vh-160px)]">
           
-          {selectedMessage && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-stone-500">Nama</p>
-                  <p className="font-medium">{selectedMessage.name}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-stone-500">Email</p>
-                  <p className="font-medium">{selectedMessage.email}</p>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-sm text-stone-500 mb-2">Pesan</p>
-                <div className="p-4 bg-amber-50 rounded-lg">
-                  <p className="text-stone-700 whitespace-pre-wrap">
-                    {selectedMessage.message}
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-sm text-stone-500">Diterima</p>
-                <p className="text-sm">{formatDate(selectedMessage.created_at || '')}</p>
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => setShowDetailDialog(false)}
-                >
-                  Tutup
-                </Button>
-                <Button
-                  className="flex-1 bg-amber-500 hover:bg-amber-600 text-white"
-                  onClick={() => window.open(`mailto:${selectedMessage.email}`)}
-                >
-                  Balas via Email
-                </Button>
+          {/* Left Panel - Conversation List */}
+          <div className={`w-full md:w-[360px] border-r border-stone-200 flex flex-col shrink-0 ${selectedUserId ? 'hidden md:flex' : 'flex'}`}>
+            {/* Search */}
+            <div className="p-3 border-b border-stone-100">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+                <Input
+                  placeholder="Cari nama pengguna..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 h-10 bg-stone-50 border-stone-200"
+                />
               </div>
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
+
+            {/* Conversation Items */}
+            <div className="flex-1 overflow-y-auto">
+              {isLoading ? (
+                <div className="flex items-center justify-center h-40">
+                  <Loader2 className="w-6 h-6 animate-spin text-amber-500" />
+                </div>
+              ) : filteredConversations.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-40 text-stone-400 text-sm">
+                  <MessageSquare className="w-8 h-8 mb-2" />
+                  Belum ada percakapan
+                </div>
+              ) : (
+                filteredConversations.map((conv) => (
+                  <button
+                    key={conv.user_id}
+                    onClick={() => openChat(conv.user_id)}
+                    className={`w-full text-left px-4 py-3 border-b border-stone-100 hover:bg-amber-50/50 transition-colors ${
+                      selectedUserId === conv.user_id ? 'bg-amber-50 border-l-4 border-l-amber-500' : ''
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                        <User className="w-5 h-5 text-amber-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-stone-800 text-sm truncate">{conv.name}</span>
+                          <span className="text-[11px] text-stone-400 shrink-0 ml-2">{formatTime(conv.last_message_at)}</span>
+                        </div>
+                        <div className="flex items-center justify-between mt-0.5">
+                          <p className="text-xs text-stone-500 truncate max-w-[200px]">{conv.last_message}</p>
+                          {conv.unread_count > 0 && (
+                            <span className="bg-amber-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shrink-0 ml-2">
+                              {conv.unread_count}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Right Panel - Chat Thread */}
+          <div className={`flex-1 flex flex-col ${selectedUserId ? 'flex' : 'hidden md:flex'}`}>
+            {selectedUserId && selectedConversation ? (
+              <>
+                {/* Chat Header */}
+                <div className="p-4 border-b border-stone-200 bg-white flex items-center gap-3 shrink-0">
+                  <button
+                    className="md:hidden text-stone-500 hover:text-stone-700"
+                    onClick={() => setSelectedUserId(null)}
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </button>
+                  <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                    <User className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-stone-800">{selectedConversation.name}</h3>
+                    <p className="text-xs text-stone-400">{selectedConversation.email}</p>
+                  </div>
+                </div>
+
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3 bg-[#f8f9fa] flex flex-col">
+                  {isChatLoading ? (
+                    <div className="m-auto"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>
+                  ) : chatMessages.length === 0 ? (
+                    <div className="m-auto text-center text-stone-400 text-sm">
+                      <MessageSquare className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                      Belum ada pesan
+                    </div>
+                  ) : (
+                    chatMessages.map(msg => {
+                      const isAdmin = Boolean(msg.is_admin);
+                      return (
+                        <div key={msg.id} className={`flex flex-col max-w-[75%] ${isAdmin ? 'self-end' : 'self-start'}`}>
+                          <div className={`px-4 py-2.5 rounded-2xl ${
+                            isAdmin
+                              ? 'bg-amber-500 text-white rounded-tr-none shadow-sm'
+                              : 'bg-white border border-stone-200 text-stone-800 rounded-tl-none shadow-sm'
+                          }`}>
+                            <p className="whitespace-pre-wrap leading-relaxed text-sm">{msg.message}</p>
+                          </div>
+                          <span className={`text-[11px] text-stone-400 mt-1 px-1 ${isAdmin ? 'text-right' : 'text-left'}`}>
+                            {formatChatTime(msg.created_at)}
+                          </span>
+                        </div>
+                      );
+                    })
+                  )}
+                  <div ref={messagesEndRef} className="h-1" />
+                </div>
+
+                {/* Reply Input */}
+                <div className="p-4 bg-white border-t border-stone-200 shrink-0">
+                  <form onSubmit={handleSendReply} className="flex gap-2 items-end">
+                    <Input
+                      placeholder="Ketik balasan..."
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      className="flex-1 h-11 rounded-xl bg-stone-50 border-stone-200 focus-visible:ring-amber-500"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          if (replyText.trim()) handleSendReply(e);
+                        }
+                      }}
+                    />
+                    <Button
+                      type="submit"
+                      disabled={!replyText.trim() || isReplying}
+                      className="h-11 w-11 rounded-xl bg-amber-500 hover:bg-amber-600 text-white shrink-0"
+                      size="icon"
+                    >
+                      {isReplying ? (
+                        <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <Send className="w-5 h-5" />
+                      )}
+                    </Button>
+                  </form>
+                </div>
+              </>
+            ) : (
+              /* Empty State */
+              <div className="flex-1 flex items-center justify-center text-stone-400">
+                <div className="text-center">
+                  <MessageSquare className="w-16 h-16 mx-auto mb-4 opacity-30" />
+                  <p className="text-lg font-medium text-stone-500">Pilih Percakapan</p>
+                  <p className="text-sm">Klik nama pelanggan di samping kiri untuk membuka chat</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+        </div>
+      </main>
     </div>
   );
 }

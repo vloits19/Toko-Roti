@@ -114,7 +114,8 @@ export function Cart() {
 
           // Trigger Midtrans Snap
           (window as any).snap.pay(tokenData.token, {
-            onSuccess: function(result: any) { 
+            onSuccess: async function(result: any) { 
+              await api.markOrderPaid(order.id);
               navigate('/payment/success', { state: { result, orderId: order.id } }); 
             },
             onPending: function(result: any) { 

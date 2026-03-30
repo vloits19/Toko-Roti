@@ -203,6 +203,12 @@ class ApiService {
     });
   }
 
+  async markOrderPaid(id: number): Promise<ApiResponse<{ order: Order }>> {
+    return this.fetch(`/orders/${id}/success`, {
+      method: 'POST'
+    });
+  }
+
   async getOrderStatistics(): Promise<ApiResponse<{ total_sales: number; total_orders: number; pending_orders: number; today_sales: number }>> {
     return this.fetch('/orders/statistics');
   }
@@ -217,6 +223,25 @@ class ApiService {
 
   async getMessages(): Promise<ApiResponse<{ messages: Message[] }>> {
     return this.fetch('/messages');
+  }
+
+  async getChatHistory(): Promise<ApiResponse<{ messages: Message[] }>> {
+    return this.fetch('/messages/chat');
+  }
+
+  async replyToUser(userId: number, message: string): Promise<ApiResponse<{ message: Message }>> {
+    return this.fetch(`/messages/reply/${userId}`, {
+      method: 'POST',
+      body: JSON.stringify({ message })
+    });
+  }
+
+  async getConversations(): Promise<ApiResponse<{ conversations: any[] }>> {
+    return this.fetch('/messages/conversations');
+  }
+
+  async getConversation(userId: number): Promise<ApiResponse<{ messages: Message[] }>> {
+    return this.fetch(`/messages/conversations/${userId}`);
   }
 
   async getUnreadMessages(): Promise<ApiResponse<{ messages: Message[]; unread_count: number }>> {

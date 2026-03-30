@@ -11,6 +11,7 @@ router.get('/my-orders', authenticate, orderController.getUserOrders);
 router.post('/', authenticate, orderController.createOrder);
 router.post('/verify-payment', authenticate, orderController.verifyPayment);
 router.get('/:id', authenticate, orderController.getOrderById);
+router.post('/:id/success', authenticate, orderController.markAsPaid);
 
 // Admin routes
 router.get('/', authenticate, requireAdmin, orderController.getAllOrders);

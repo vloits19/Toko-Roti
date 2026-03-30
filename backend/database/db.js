@@ -133,6 +133,18 @@ function initDatabase() {
     // Ignore error
   }
 
+  // Add columns to messages for chat functionality
+  try {
+    db.prepare("ALTER TABLE messages ADD COLUMN user_id INTEGER").run();
+  } catch (e) {
+    // Ignore error
+  }
+  try {
+    db.prepare("ALTER TABLE messages ADD COLUMN is_admin INTEGER DEFAULT 0").run();
+  } catch (e) {
+    // Ignore error
+  }
+
   console.log('Database initialized successfully');
 }
 
@@ -159,76 +171,175 @@ function seedData() {
   if (productCount.count === 0) {
     const products = [
       {
-        name: 'Roti Tawar Premium',
-        price: 25000,
-        description: 'Roti tawar lembut dengan tekstur empuk, cocok untuk sarapan atau sandwich. Dibuat dengan bahan berkualitas tinggi.',
-        image_url: '/images/roti-tawar.jpg',
-        category: 'roti tawar',
+        name: 'Kue Soes Kering Cokelat',
+        price: 15000,
+        description: 'Kue soes kering renyah dengan isian cokelat lumer yang nikmat. Camilan perfect teman ngopi.',
+        image_url: '/images/kue-soes.png',
+        category: 'kue kering',
         stock: 50,
         is_featured: 1
       },
       {
-        name: 'Croissant Butter',
+        name: 'Snack Barcelona',
+        price: 8000,
+        description: 'Snack ekstrudat kacang merek Barcelona, gurih dan renyah. Cocok untuk ngemil sehari-hari.',
+        image_url: '/images/snack-barcelona.png',
+        category: 'snack',
+        stock: 100,
+        is_featured: 1
+      },
+      {
+        name: 'Pilus Ikan Bumbu Cikur',
+        price: 5000,
+        description: 'Pilus ikan renyah dengan bumbu cikur (kencur) khas yang bikin nagih. Snack tradisional favorit.',
+        image_url: '/images/pilus-ikan.png',
+        category: 'snack',
+        stock: 80,
+        is_featured: 0
+      },
+      {
+        name: 'Kerupuk Slondok Singkong',
+        price: 10000,
+        description: 'Kerupuk slondok dari singkong pilihan, tipis renyah dan gurih. Oleh-oleh khas Jawa.',
+        image_url: '/images/kerupuk-slondok.png',
+        category: 'kerupuk',
+        stock: 60,
+        is_featured: 1
+      },
+      {
+        name: 'Brem Padat Manis',
+        price: 12000,
+        description: 'Brem padat tradisional dari fermentasi beras ketan, manis legit. Jajanan khas Madiun.',
+        image_url: '/images/brem-padat.png',
+        category: 'tradisional',
+        stock: 40,
+        is_featured: 0
+      },
+      {
+        name: 'Makaroni Kering Berbumbu',
+        price: 10000,
+        description: 'Makaroni kering yang digoreng renyah dengan bumbu pedas gurih. Snack kekinian favorit.',
+        image_url: '/images/makaroni-kering.png',
+        category: 'snack',
+        stock: 70,
+        is_featured: 1
+      },
+      {
+        name: 'Mie Lidi Pedas',
+        price: 7000,
+        description: 'Jajanan mie lidi pedas dan asin, tipis renyah bikin ketagihan. Camilan legendaris anak sekolah.',
+        image_url: '/images/mie-lidi.png',
+        category: 'snack',
+        stock: 90,
+        is_featured: 1
+      },
+      {
+        name: 'Mino (Mini Nopia)',
+        price: 15000,
+        description: 'Mini nopia isi gula merah khas Banyumas, manis legit dengan aroma khas. Oleh-oleh populer.',
+        image_url: '/images/mino-nopia.png',
+        category: 'tradisional',
+        stock: 35,
+        is_featured: 0
+      },
+      {
+        name: 'Keripik Usus Ayam Krispi',
         price: 18000,
-        description: 'Croissant renyah dengan lapisan butter yang melimpah. Autentik French pastry.',
-        image_url: '/images/croissant.jpg',
-        category: 'pastry',
+        description: 'Keripik usus ayam yang digoreng krispi, gurih dan renyah sempurna. Camilan protein tinggi.',
+        image_url: '/images/keripik-usus.png',
+        category: 'keripik',
         stock: 30,
         is_featured: 1
       },
       {
-        name: 'Donat Glaze',
-        price: 12000,
-        description: 'Donat lembut dengan glaze manis yang menggugah selera. Tersedia berbagai varian rasa.',
-        image_url: '/images/donat.jpg',
-        category: 'donat',
-        stock: 40,
-        is_featured: 1
-      },
-      {
-        name: 'Roti Coklat Hazelnut',
-        price: 22000,
-        description: 'Roti lembut dengan isian coklat hazelnut yang creamy dan nikmat.',
-        image_url: '/images/roti-coklat.jpg',
-        category: 'roti isi',
+        name: 'Samosa Mini Isi Abon',
+        price: 20000,
+        description: 'Samosa mini kering berisi abon daging sapi yang gurih. Cocok untuk suguhan tamu atau arisan.',
+        image_url: '/images/samosa-mini.png',
+        category: 'kue kering',
         stock: 25,
         is_featured: 1
       },
       {
-        name: 'Baguette Tradisional',
-        price: 20000,
-        description: 'Baguette autentik dengan kulit renyah dan bagian dalam yang lembut.',
-        image_url: '/images/baguette.jpg',
-        category: 'roti tawar',
-        stock: 20,
+        name: 'Tahu Bulat Goreng',
+        price: 5000,
+        description: 'Tahu bulat goreng renyah di luar lembut di dalam. Street food viral yang selalu jadi favorit.',
+        image_url: '/images/tahu-bulat.png',
+        category: 'gorengan',
+        stock: 100,
         is_featured: 0
       },
       {
-        name: 'Roti Keju',
-        price: 28000,
-        description: 'Roti dengan taburan keju melimpah, panggang sempurna dengan aroma menggoda.',
-        image_url: '/images/roti-keju.jpg',
-        category: 'roti isi',
-        stock: 35,
+        name: 'Keripik Tempe Magelang',
+        price: 15000,
+        description: 'Keripik tempe tipis khas Magelang, gurih renyah bumbu bawang. Oleh-oleh legendaris Jawa Tengah.',
+        image_url: '/images/keripik-tempe.png',
+        category: 'keripik',
+        stock: 45,
         is_featured: 1
       },
       {
-        name: 'Cinnamon Roll',
-        price: 25000,
-        description: 'Gulungan roti dengan taburan kayu manis dan glaze cream cheese.',
-        image_url: '/images/cinnamon-roll.jpg',
-        category: 'pastry',
-        stock: 15,
+        name: 'Kacang Tanah Goreng/Oven',
+        price: 12000,
+        description: 'Kacang tanah pilihan digoreng atau di-oven hingga matang sempurna. Gurih alami dan sehat.',
+        image_url: '/images/kacang-goreng.png',
+        category: 'kacang',
+        stock: 55,
         is_featured: 0
       },
       {
-        name: 'Roti Kacang Merah',
-        price: 20000,
-        description: 'Roti tradisional dengan isian kacang merah manis yang lembut.',
-        image_url: '/images/roti-kacang.jpg',
-        category: 'roti isi',
+        name: 'Jelly Cup Inaco',
+        price: 3000,
+        description: 'Jelly cup Inaco berbagai rasa buah segar. Dessert praktis dan menyegarkan untuk segala usia.',
+        image_url: '/images/jelly-inaco.png',
+        category: 'minuman',
+        stock: 200,
+        is_featured: 1
+      },
+      {
+        name: 'Permen Cokelat Batu Kerikil (Arab)',
+        price: 25000,
+        description: 'Permen cokelat unik berbentuk batu kerikil khas Timur Tengah. Cocok untuk hampers dan hantaran.',
+        image_url: '/images/permen-arab.png',
+        category: 'permen',
         stock: 30,
         is_featured: 0
+      },
+      {
+        name: 'Keripik Tortilla (Snack Tes)',
+        price: 10000,
+        description: 'Keripik tortilla renyah dengan bumbu pedas. Snack modern ala western yang cocok untuk ngemil santai.',
+        image_url: '/images/kerupuk-slondok.png',
+        category: 'snack',
+        stock: 65,
+        is_featured: 0
+      },
+      {
+        name: 'Kerupuk Gadung',
+        price: 12000,
+        description: 'Kerupuk gadung tradisional, renyah dan gurih khas. Jajanan pasar langka yang susah dicari.',
+        image_url: '/images/kerupuk-slondok.png',
+        category: 'kerupuk',
+        stock: 40,
+        is_featured: 0
+      },
+      {
+        name: 'Nastar',
+        price: 35000,
+        description: 'Kue nastar premium isi selai nanas homemade, lembut meleleh di mulut. Wajib ada saat Lebaran.',
+        image_url: '/images/kue-soes.png',
+        category: 'kue kering',
+        stock: 20,
+        is_featured: 1
+      },
+      {
+        name: 'Kue Putri Salju',
+        price: 35000,
+        description: 'Kue putri salju bertabur gula halus, lembut dan meleleh. Kue kering khas Lebaran yang timeless.',
+        image_url: '/images/brem-padat.png',
+        category: 'kue kering',
+        stock: 20,
+        is_featured: 1
       }
     ];
 

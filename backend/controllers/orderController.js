@@ -229,6 +229,34 @@ const verifyPayment = async (req, res) => {
   }
 };
 
+// Mock payment success for local testing environment
+const markAsPaid = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const order = Order.findById(id);
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    // Check ownership
+    if (order.user_id !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const updated = Order.updateStatus(id, { payment_status: 'paid', order_status: 'processing' });
+    
+    res.json({
+      success: true,
+      message: 'Order marked as paid successfully',
+      data: { order: updated }
+    });
+  } catch (error) {
+    console.error('Mark as paid error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 // Get order statistics (Admin)
 const getStatistics = async (req, res) => {
   try {
@@ -254,5 +282,6 @@ module.exports = {
   createOrder,
   updateOrderStatus,
   verifyPayment,
-  getStatistics
+  getStatistics,
+  markAsPaid
 };

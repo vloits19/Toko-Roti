@@ -1,4 +1,5 @@
 const Message = require('../models/Message');
+const User = require('../models/User');
 
 // Get all messages (Admin)
 const getAllMessages = async (req, res) => {
@@ -40,32 +41,55 @@ const getUnreadMessages = async (req, res) => {
   }
 };
 
-// Create message (Public contact form)
+// Create message (Public contact form or User Chat)
 const createMessage = async (req, res) => {
   try {
     const { name, email, message } = req.body;
+    let userId = null;
+    let senderName = name;
+    let senderEmail = email;
+
+    // If user is logged in, look up their real name from DB
+    if (req.user) {
+      userId = req.user.id;
+      const dbUser = User.findById(req.user.id);
+      if (dbUser) {
+        senderName = dbUser.name;
+        senderEmail = dbUser.email;
+      }
+    }
 
     // Validation
-    if (!name || !email || !message) {
+    if (!senderName || !message) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide name, email, and message'
+        message: 'Please provide name and message'
       });
     }
 
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide a valid email'
-      });
+    // Email validation only for guests (logged-in users already have verified emails)
+    if (!req.user) {
+      if (!senderEmail) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide an email'
+        });
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(senderEmail)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide a valid email'
+        });
+      }
     }
 
     const newMessage = Message.create({
-      name,
-      email,
-      message
+      name: senderName,
+      email: senderEmail || '',
+      message,
+      user_id: userId,
+      is_admin: 0
     });
 
     res.status(201).json({
@@ -154,11 +178,112 @@ const getUnreadCount = async (req, res) => {
   }
 };
 
+// Get user chat history
+const getUserChat = async (req, res) => {
+  try {
+    const messages = Message.findByUserId(req.user.id);
+    res.json({
+      success: true,
+      data: { messages }
+    });
+  } catch (error) {
+    console.error('Get user chat error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+};
+
+// Admin reply to specific user
+const replyToUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { message } = req.body;
+
+    if (!message) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a message'
+      });
+    }
+
+    const user = User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const newMessage = Message.create({
+      name: 'Admin',
+      email: 'admin@rotilezat.com',
+      message,
+      user_id: user.id,
+      is_admin: 1
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Reply sent',
+      data: { message: newMessage }
+    });
+  } catch (error) {
+    console.error('Reply to user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+};
+
+// Get all conversations for admin (grouped by user)
+const getConversations = async (req, res) => {
+  try {
+    const conversations = Message.getConversations();
+    res.json({
+      success: true,
+      data: { conversations }
+    });
+  } catch (error) {
+    console.error('Get conversations error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// Get specific conversation thread for admin
+const getConversation = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const messages = Message.findByUserId(parseInt(userId));
+    
+    // Mark all user messages as read
+    messages.forEach(msg => {
+      if (!msg.is_admin && !msg.is_read) {
+        Message.markAsRead(msg.id);
+      }
+    });
+
+    res.json({
+      success: true,
+      data: { messages }
+    });
+  } catch (error) {
+    console.error('Get conversation error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 module.exports = {
   getAllMessages,
   getUnreadMessages,
   createMessage,
   markAsRead,
   deleteMessage,
-  getUnreadCount
+  getUnreadCount,
+  getUserChat,
+  replyToUser,
+  getConversations,
+  getConversation
 };

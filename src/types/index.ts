@@ -65,6 +65,8 @@ export interface Message {
   email: string;
   message: string;
   is_read: number;
+  user_id?: number | null;
+  is_admin?: number;
   created_at?: string;
 }
 

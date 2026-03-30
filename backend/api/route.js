@@ -19,7 +19,12 @@ router.post('/token', async (req, res) => {
         gross_amount: gross_amount
       },
       item_details,
-      customer_details
+      customer_details,
+      // Memaksa (force override) memunculkan metode pembayaran ini di Pop-UP
+      enabled_payments: [
+        "credit_card", "bca_va", "bni_va", "bri_va", "other_va", 
+        "gopay", "shopeepay", "alfamart", "indomaret"
+      ]
     };
 
     const transaction = await snap.createTransaction(parameter);
