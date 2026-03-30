@@ -1,29 +1,43 @@
-const Database = require('better-sqlite3');
+let Database;
+let db = null;
+let dbError = null;
 const path = require('path');
 const fs = require('fs');
 
-// Ensure database directory exists
-const dbDir = path.join(__dirname);
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
-}
-
-let dbPath;
-if (process.env.VERCEL) {
-  dbPath = '/tmp/rotilezat.db';
-  const seedDbPath = path.join(dbDir, 'rotilezat.db');
-  if (!fs.existsSync(dbPath) && fs.existsSync(seedDbPath)) {
-    fs.copyFileSync(seedDbPath, dbPath);
+try {
+  Database = require('better-sqlite3');
+  
+  // Ensure database directory exists
+  const dbDir = path.join(__dirname);
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
   }
-} else {
-  dbPath = path.join(dbDir, 'rotilezat.db');
+
+  let dbPath;
+  if (process.env.VERCEL) {
+    dbPath = '/tmp/rotilezat.db';
+    const seedDbPath = path.join(dbDir, 'rotilezat.db');
+    if (!fs.existsSync(dbPath) && fs.existsSync(seedDbPath)) {
+      try { fs.copyFileSync(seedDbPath, dbPath); } catch(e) {}
+    }
+  } else {
+    dbPath = path.join(dbDir, 'rotilezat.db');
+  }
+
+  db = new Database(dbPath);
+
+  // Enable foreign keys
+  db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
+} catch (error) {
+  console.error("DB Initialization Error:", error);
+  dbError = error;
+  db = {
+    prepare: () => { throw new Error('DB Init Failed: ' + (dbError ? dbError.message : 'Unknown error')); },
+    exec: () => { throw new Error('DB Init Failed: ' + (dbError ? dbError.message : 'Unknown error')); },
+    pragma: () => { throw new Error('DB Init Failed: ' + (dbError ? dbError.message : 'Unknown error')); }
+  };
 }
-
-const db = new Database(dbPath);
-
-// Enable foreign keys
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
 
 // Initialize tables
 function initDatabase() {
@@ -365,7 +379,15 @@ function seedData() {
 }
 
 // Initialize and seed
-initDatabase();
-seedData();
+if (!dbError) {
+  try {
+    initDatabase();
+    seedData();
+  } catch (error) {
+    console.error("Init tables error:", error);
+    dbError = error;
+  }
+}
 
+db.getError = () => dbError;
 module.exports = db;

@@ -1,22 +1,17 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-let dbError = null;
-try {
-  require('./database/db'); // Initialize database
-} catch (error) {
-  console.error("Critical Database Initialization Error:", error);
-  dbError = error;
-}
+const db = require('./database/db'); // Initialize database
 
 const app = express();
 
 app.use((req, res, next) => {
-  if (dbError && req.path.startsWith('/api/') && req.path !== '/api/health') {
+  const initError = db.getError && db.getError();
+  if (initError && req.path.startsWith('/api/') && req.path !== '/api/health') {
     return res.status(500).json({
       success: false,
-      message: 'Database initialization failed on Vercel: ' + dbError.message,
-      stack: dbError.stack
+      message: 'Database initialization failed on Vercel: ' + initError.message,
+      stack: initError.stack
     });
   }
   next();
