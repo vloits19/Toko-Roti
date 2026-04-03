@@ -14,7 +14,8 @@ import {
   ShoppingBag, 
   ArrowRight, 
   Package,
-  Shield
+  Shield,
+  MapPin
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -25,6 +26,100 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+
+L.Icon.Default.mergeOptions({
+  iconUrl: markerIcon,
+  iconRetinaUrl: markerIcon2x,
+  shadowUrl: markerShadow,
+});
+
+const storeIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+function CurrentLocationButton({ setPosition, setAddress }: { setPosition: (pos: L.LatLng) => void, setAddress: (addr: string) => void }) {
+  const map = useMap();
+  const [loading, setLoading] = useState(false);
+
+  const handleCurrentLocation = () => {
+    if ('geolocation' in navigator) {
+      setLoading(true);
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const latlng = new L.LatLng(position.coords.latitude, position.coords.longitude);
+          setPosition(latlng);
+          map.flyTo(latlng, 15);
+          
+          fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}`)
+            .then(res => res.json())
+            .then(data => {
+              if (data && data.display_name) {
+                setAddress(data.display_name);
+              }
+            })
+            .catch(err => console.error(err))
+            .finally(() => setLoading(false));
+        },
+        (error) => {
+          console.error(error);
+          alert('Gagal mendapatkan lokasi Anda. Pastikan ada izin akses lokasi.');
+          setLoading(false);
+        }
+      );
+    } else {
+      alert('Browser Anda tidak mendukung fitur lokasi geografi.');
+    }
+  };
+
+  return (
+    <Button
+      type="button"
+      size="sm"
+      className="absolute top-2 right-2 z-[400] bg-white text-stone-800 hover:bg-stone-100 shadow-md border"
+      onClick={handleCurrentLocation}
+      disabled={loading}
+    >
+      <MapPin className="w-4 h-4 mr-2" />
+      {loading ? 'Mencari...' : 'Gunakan Lokasi Saya'}
+    </Button>
+  );
+}
+
+function LocationMarker({ position, setPosition, setAddress }: { position: L.LatLng | null, setPosition: (pos: L.LatLng) => void, setAddress: (addr: string) => void }) {
+  useMapEvents({
+    click(e) {
+      setPosition(e.latlng);
+      fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${e.latlng.lat}&lon=${e.latlng.lng}`)
+        .then(res => res.json())
+        .then(data => {
+          if(data && data.display_name) {
+            setAddress(data.display_name);
+          }
+        })
+        .catch(err => console.error(err));
+    },
+  });
+
+  return position === null ? null : (
+    <Marker position={position}>
+      <Popup>Lokasi Pengiriman Anda</Popup>
+    </Marker>
+  );
+}
 
 // Removed custom PAYMENT_METHODS since we use Midtrans
 
@@ -38,6 +133,8 @@ export function Cart() {
   const [shippingPhone, setShippingPhone] = useState('');
   const [shippingAddress, setShippingAddress] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [shippingLocation, setShippingLocation] = useState<L.LatLng | null>(null);
+  const storeLocationRaw: [number, number] = [-7.3940165, 109.7008494];
 
   useEffect(() => {
     // Pre-fill from profile when dialog opens
@@ -312,13 +409,32 @@ export function Cart() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="shippingAddress">Alamat Lengkap</Label>
+              <Label>Lokasi pada Peta</Label>
+              <div className="h-[200px] w-full rounded-md border overflow-hidden relative z-0">
+                <MapContainer center={storeLocationRaw} zoom={13} style={{ height: '100%', width: '100%', zIndex: 0 }}>
+                  <TileLayer
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                  />
+                  <Marker position={storeLocationRaw} icon={storeIcon}>
+                    <Popup>
+                      <strong>Toko Roti Lezat</strong><br/>
+                      Lokasi Toko
+                    </Popup>
+                  </Marker>
+                  <LocationMarker position={shippingLocation} setPosition={setShippingLocation} setAddress={setShippingAddress} />
+                  <CurrentLocationButton setPosition={setShippingLocation} setAddress={setShippingAddress} />
+                </MapContainer>
+              </div>
+              <p className="text-xs text-stone-500 mb-4">Klik pada peta untuk menentukan lokasi tujuan pengiriman secara otomatis.</p>
+              
+              <Label htmlFor="shippingAddress">Alamat Lengkap (Detail)</Label>
               <textarea
                 id="shippingAddress"
                 value={shippingAddress}
                 onChange={(e) => setShippingAddress(e.target.value)}
-                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                placeholder="Contoh: Jl. Merdeka No 123, RT 01/RW 02, Kec. Sukamaju, Kota Jakarta Selatan..."
+                className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                placeholder="Contoh: Jl. Merdeka No 123, Blok A2..."
                 required
               />
             </div>
