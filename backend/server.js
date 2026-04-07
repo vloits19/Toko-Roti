@@ -36,8 +36,8 @@ app.use('/api/midtrans', require('./api/route'));
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    success: true, 
+  res.json({
+    success: true,
     message: 'Server is running',
     timestamp: new Date().toISOString()
   });
@@ -47,7 +47,7 @@ app.get('/api/health', (req, res) => {
 app.post('/api/webhook/:provider', async (req, res) => {
   const { provider } = req.params;
   const paymentService = require('./services/paymentService');
-  
+
   try {
     const result = await paymentService.handleWebhook(provider, req.body);
     res.json(result);
