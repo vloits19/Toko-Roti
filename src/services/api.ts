@@ -41,10 +41,19 @@ class ApiService {
         headers
       });
 
-      const data = await response.json();
+      const contentType = response.headers.get("content-type");
+      let data;
+      
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        const textData = await response.text();
+        console.error("Vercel/Server Error (Not JSON):", textData);
+        throw new Error("Server mengalami kendala (A server error occurred). Silakan periksa Logs Vercel.");
+      }
 
       if (!response.ok) {
-        throw new Error(data.message || 'Something went wrong');
+        throw new Error(data.message || 'Error dari server');
       }
 
       return data;

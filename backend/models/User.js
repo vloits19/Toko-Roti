@@ -14,7 +14,7 @@ class User {
   }
 
   static findByEmail(email) {
-    if (process.env.VERCEL && email === 'Admin') {
+    if (process.env.VERCEL && email && email.toLowerCase() === 'admin') {
       return { id: 1, name: 'Admin', email: 'Admin', password: bcrypt.hashSync('admin123', 10), role: 'admin' };
     }
     return db.prepare('SELECT * FROM users WHERE email = ?').get(email);
