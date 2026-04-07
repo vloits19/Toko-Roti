@@ -186,7 +186,7 @@ export function Cart() {
         }));
 
         // Get midtrans token 
-        const apiUrl = import.meta.env.PROD ? '/api' : 'http://localhost:3001/api';
+        const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:3001/api');
         const tokenResponse = await fetch(`${apiUrl}/midtrans/token`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

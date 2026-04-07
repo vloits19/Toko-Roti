@@ -13,6 +13,13 @@ router.post('/token', async (req, res) => {
   try {
     const { order_id, gross_amount, item_details, customer_details } = req.body;
 
+    // Midtrans strictly requires a valid format for email
+    if (customer_details) {
+      if (!customer_details.email || !customer_details.email.includes('@')) {
+        customer_details.email = 'customer@example.com';
+      }
+    }
+
     const parameter = {
       transaction_details: {
         order_id: order_id,
