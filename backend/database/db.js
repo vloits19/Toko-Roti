@@ -6,7 +6,6 @@ const fs = require('fs');
 
 try {
   if (process.env.VERCEL) {
-    dbError = new Error('SQLite bypassed on Vercel');
     db = {
       prepare: () => ({ all: () => [], get: () => null, run: () => ({ changes: 1, lastInsertRowid: 1 }) }),
       exec: () => {}, pragma: () => {}
@@ -377,7 +376,7 @@ function seedData() {
 }
 
 // Initialize and seed
-if (!dbError) {
+if (!process.env.VERCEL && !dbError) {
   try {
     initDatabase();
     seedData();
