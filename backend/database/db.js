@@ -11,7 +11,9 @@ try {
       exec: () => {}, pragma: () => {}
     };
   } else {
-    Database = require('better-sqlite3');
+    // Obfuscate the require to completely hide it from Vercel's static analyzer
+    const sqliteModule = 'better' + '-' + 'sqlite3';
+    Database = require(sqliteModule);
     
     // Ensure database directory exists
     const dbDir = path.join(__dirname);
