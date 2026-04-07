@@ -1,7 +1,11 @@
 const db = require('../database/db');
 
+// Mock data
+const MOCK_ORDER = { id: 1, user_id: 1, user_name: 'Admin', user_email: 'Admin', user_phone: '08123456', total_price: 15000, payment_method: 'midtrans', payment_status: 'paid', order_status: 'completed', created_at: new Date() };
+
 class Order {
   static findAll() {
+    if (process.env.VERCEL) return [MOCK_ORDER];
     return db.prepare(`
       SELECT o.*, u.name as user_name, u.email as user_email, u.phone as user_phone
       FROM orders o 
@@ -11,6 +15,7 @@ class Order {
   }
 
   static findByUserId(userId) {
+    if (process.env.VERCEL) return [MOCK_ORDER];
     return db.prepare(`
       SELECT o.*, u.name as user_name, u.email as user_email, u.phone as user_phone
       FROM orders o 
@@ -21,6 +26,7 @@ class Order {
   }
 
   static findById(id) {
+    if (process.env.VERCEL) return MOCK_ORDER;
     return db.prepare(`
       SELECT o.*, u.name as user_name, u.email as user_email, u.phone as user_phone
       FROM orders o 
@@ -30,6 +36,7 @@ class Order {
   }
 
   static create({ user_id, total_price, payment_method, shipping_phone, shipping_address }) {
+    if (process.env.VERCEL) return MOCK_ORDER;
     const result = db.prepare(
       `INSERT INTO orders (user_id, total_price, payment_method, shipping_phone, shipping_address) 
        VALUES (?, ?, ?, ?, ?)`
@@ -39,6 +46,7 @@ class Order {
   }
 
   static updateStatus(id, { payment_status, order_status }) {
+    if (process.env.VERCEL) return MOCK_ORDER;
     const updates = [];
     const values = [];
     
@@ -64,12 +72,14 @@ class Order {
   }
 
   static delete(id) {
+    if (process.env.VERCEL) return true;
     const result = db.prepare('DELETE FROM orders WHERE id = ?').run(id);
     return result.changes > 0;
   }
 
   // Order Items
   static addOrderItem(order_id, product_id, quantity, price) {
+    if (process.env.VERCEL) return 1;
     const result = db.prepare(
       `INSERT INTO order_items (order_id, product_id, quantity, price) 
        VALUES (?, ?, ?, ?)`
@@ -79,6 +89,7 @@ class Order {
   }
 
   static getOrderItems(orderId) {
+    if (process.env.VERCEL) return [{ id: 1, order_id: 1, product_id: 1, quantity: 1, price: 15000, product_name: 'Kue Soes', image_url: '' }];
     return db.prepare(`
       SELECT oi.*, p.name as product_name, p.image_url 
       FROM order_items oi 
@@ -89,6 +100,9 @@ class Order {
 
   // Statistics
   static getStatistics() {
+    if (process.env.VERCEL) {
+      return { total_sales: 15000, total_orders: 1, pending_orders: 0, today_sales: 15000 };
+    }
     const totalSales = db.prepare(`
       SELECT COALESCE(SUM(total_price), 0) as total FROM orders WHERE payment_status = 'paid'
     `).get();
