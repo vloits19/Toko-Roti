@@ -1,19 +1,17 @@
-const db = require('./database/db');
-const bcrypt = require('bcryptjs');
+const Database = require('better-sqlite3');
+const path = require('path');
 
-// Delete all orders & cart to make it a fresh state. 
-db.prepare('DELETE FROM order_items').run();
-db.prepare('DELETE FROM orders').run();
-db.prepare('DELETE FROM cart').run();
+const dbPath = path.join(__dirname, 'database', 'rotilezat.db');
+const db = new Database(dbPath);
 
-// Delete old admin and insert new admin
-db.prepare('DELETE FROM users WHERE email = ?').run('admin@rotilezat.com');
-db.prepare('DELETE FROM users WHERE email = ?').run('Admin');
+console.log('Disabling foreign keys temporarily...');
+db.pragma('foreign_keys = OFF');
 
-const hashedPassword = bcrypt.hashSync('admin123', 10);
-db.prepare(`
-    INSERT INTO users (name, email, password, role) 
-    VALUES (?, ?, ?, ?)
-`).run('Admin', 'Admin', hashedPassword, 'admin');
+console.log('Clearing old products from local database...');
+const res1 = db.prepare('DELETE FROM cart').run();
+const res2 = db.prepare('DELETE FROM order_items').run();
+const res3 = db.prepare('DELETE FROM products').run();
 
-console.log('DB updated correctly');
+db.pragma('foreign_keys = ON');
+
+console.log(`Deleted ${res3.changes} products, ${res1.changes} cart items, ${res2.changes} order items.`);
